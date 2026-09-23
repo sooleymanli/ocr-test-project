@@ -4,7 +4,7 @@ import ResultModal from './components/ResultModal'
 import type { ScanIdCardResult } from './utils/scanIdCard'
 import './App.css'
 
-const IdCardCalibrator = import.meta.env.DEV ? lazy(() => import('./dev/IdCardCalibrator')) : null
+const IdCardCalibrator = lazy(() => import('./dev/IdCardCalibrator'))
 
 type Stage = 'idle' | 'scanning' | 'result'
 
@@ -72,11 +72,9 @@ function App() {
           </dl>
         )}
 
-        {IdCardCalibrator && (
           <button type="button" className="btn btn-secondary" onClick={() => setShowCalibrator(true)}>
             Kalibrasiya aləti (dev)
           </button>
-        )}
       </main>
 
       {stage === 'scanning' && <CameraScanner onScanned={handleScanned} onClose={() => setStage('idle')} />}
