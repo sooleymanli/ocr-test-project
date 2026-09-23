@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import CameraScanner from './components/CameraScanner'
 import ResultModal from './components/ResultModal'
 import type { ScanIdCardResult } from './utils/scanIdCard'
 import './App.css'
+
+const IdCardCalibrator = import.meta.env.DEV ? lazy(() => import('./dev/IdCardCalibrator')) : null
 
 type Stage = 'idle' | 'scanning' | 'result'
 
@@ -15,6 +17,7 @@ function App() {
   const [stage, setStage] = useState<Stage>('idle')
   const [scanResult, setScanResult] = useState<ScanIdCardResult | null>(null)
   const [confirmed, setConfirmed] = useState<ConfirmedValues | null>(null)
+  const [showCalibrator, setShowCalibrator] = useState(false)
 
   function handleScanned(result: ScanIdCardResult) {
     setScanResult(result)
@@ -68,12 +71,29 @@ function App() {
             </div>
           </dl>
         )}
+
+        {/* {IdCardCalibrator && (
+          <button type="button" className="btn btn-secondary" onClick={() => setShowCalibrator(true)}>
+            Kalibrasiya aləti (dev)
+          </button>
+        )} */}
       </main>
 
       {stage === 'scanning' && <CameraScanner onScanned={handleScanned} onClose={() => setStage('idle')} />}
 
       {stage === 'result' && scanResult && (
         <ResultModal result={scanResult} onRetry={handleRetry} onConfirm={handleConfirm} onClose={handleClose} />
+      )}
+
+      {IdCardCalibrator && showCalibrator && (
+        <div className="calibrator-overlay">
+          <button type="button" className="btn btn-secondary calibrator-close" onClick={() => setShowCalibrator(false)}>
+            Bağla
+          </button>
+          <Suspense fallback={<p>Yüklənir...</p>}>
+            <IdCardCalibrator />
+          </Suspense>
+        </div>
       )}
     </div>
   )

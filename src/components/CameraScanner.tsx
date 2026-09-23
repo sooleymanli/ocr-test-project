@@ -25,7 +25,15 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
 
   useEffect(() => stopStream, [stopStream])
 
-  async function handleStartCamera() {
+  // The <video> element only mounts once cameraState is 'live', so attach the
+  // stream here (after it exists in the DOM) instead of right after getUserMedia resolves.
+  useEffect(() => {
+    if (cameraState === 'live' && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [cameraState])
+
+  const handleStartCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraState('unsupported')
       setErrorMessage('Bu brauzer kameraya girişi dəstəkləmir. Qalereyadan şəkil yükləyə bilərsiniz.')
@@ -39,7 +47,6 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
         audio: false,
       })
       streamRef.current = stream
-      if (videoRef.current) videoRef.current.srcObject = stream
       setCameraState('live')
     } catch (err) {
       const name = err instanceof DOMException ? err.name : ''
@@ -51,7 +58,14 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
         setErrorMessage('Kameraya giriş mümkün olmadı. Qalereyadan şəkil yükləyə bilərsiniz.')
       }
     }
-  }
+  }, [])
+
+  // Open the camera as soon as the scanner is shown, matching the "tap scan → camera opens" expectation.
+  useEffect(() => {
+    const timer = setTimeout(() => void handleStartCamera(), 0)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleCapture() {
     const video = videoRef.current
