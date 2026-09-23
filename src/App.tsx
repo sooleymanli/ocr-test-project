@@ -20,9 +20,19 @@ function App() {
     setOcrError(null)
     try {
       const worker = await createWorker('aze+eng')
-      const { data } = await worker.recognize(imageDataUrl)
+      const { data } = await worker.recognize(imageDataUrl, {}, { blocks: true })
       await worker.terminate()
-      setParsed(parseIdCard(data.text))
+
+      // Drop low-confidence words (watermark/glare noise) before scanning for name fields.
+      const words = (data.blocks ?? []).flatMap((block) =>
+        block.paragraphs.flatMap((paragraph) => paragraph.lines.flatMap((line) => line.words)),
+      )
+      const cleanNameText = words
+        .filter((word) => word.confidence >= 55)
+        .map((word) => word.text)
+        .join('\n')
+
+      setParsed(parseIdCard(data.text, cleanNameText))
     } catch (err) {
       console.error('OCR failed', err)
       setOcrError(err instanceof Error ? err.message : 'Mətn tanınarkən xəta baş verdi')

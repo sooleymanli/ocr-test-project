@@ -16,6 +16,8 @@ const EXCLUDE_WORDS = new Set([
   'AZƏRBAYCAN', 'AZERBAIJAN', 'RESPUBLİKASI', 'REPUBLIC', 'REPUBLİKASI',
   'ŞƏXSİYYƏT', 'VƏSİQƏSİ', 'IDENTITY', 'CARD', 'SURNAME', 'GIVEN', 'NAME',
   'NATIONALITY', 'PERSONAL', 'HOLDERS', 'SIGNATURE', 'EXPIRY', 'BIRTH', 'DATE',
+  'SEX', 'MALE', 'FEMALE', 'NUMBER', 'DOCUMENT', 'TYPE', 'ISSUE', 'ISSUING',
+  'AUTHORITY', 'PLACE', 'RESIDENCE', 'VALID', 'VALIDITY', 'AZE', 'MRZ',
 ])
 
 function findLabelValue(lines: string[], labels: string[]): string | null {
@@ -40,7 +42,7 @@ function findNameWords(text: string): string[] {
   return matches.filter((word) => !EXCLUDE_WORDS.has(word))
 }
 
-export function parseIdCard(text: string): ParsedIdCard {
+export function parseIdCard(text: string, nameSourceText?: string): ParsedIdCard {
   const lines = text
     .split('\n')
     .map((line) => line.trim())
@@ -52,7 +54,7 @@ export function parseIdCard(text: string): ParsedIdCard {
 
   const labelSoyadi = findLabelValue(lines, ['SOYADI', 'SURNAME', 'LAST NAME'])
   const labelAdi = findLabelValue(lines, ['ADI', 'GIVEN NAME', 'FIRST NAME'])
-  const nameWords = labelSoyadi && labelAdi ? [] : findNameWords(text)
+  const nameWords = labelSoyadi && labelAdi ? [] : findNameWords(nameSourceText ?? text)
 
   return {
     fin: finMatch ? finMatch[1] ?? finMatch[0] : null,
