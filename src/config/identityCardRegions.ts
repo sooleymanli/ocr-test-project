@@ -12,16 +12,16 @@ export interface CropRegion {
  */
 export const IDENTITY_CARD_REGIONS = {
   serialNumber: {
-    x: 0.345,
-    y: 0.675,
-    width: 0.240,
-    height: 0.100,
-  },
-  fin: {
-    x: 0.614,
+    x: 0.337,
     y: 0.688,
     width: 0.270,
-    height: 0.100,
+    height: 0.088,
+  },
+  fin: {
+    x: 0.620,
+    y: 0.692,
+    width: 0.222,
+    height: 0.090,
   },
 } satisfies Record<string, CropRegion>
 
