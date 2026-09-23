@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { IDENTITY_CARD_REGIONS } from '../config/identityCardRegions'
 import { computeGuideFractionInVideo } from '../utils/imagePipeline'
 import { scanIdCard, scanIdCardImage, type ScanIdCardResult } from '../utils/scanIdCard'
 
@@ -120,10 +121,33 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
 
         {(cameraState === 'live' || cameraState === 'scanning') && (
           <div className="scanner-guide">
-            <div ref={frameRef} className="scanner-guide-frame" />
+            <div ref={frameRef} className="scanner-guide-frame">
+              <div
+                className="scanner-field-hint"
+                style={{
+                  left: `${IDENTITY_CARD_REGIONS.serialNumber.x * 100}%`,
+                  top: `${IDENTITY_CARD_REGIONS.serialNumber.y * 100}%`,
+                  width: `${IDENTITY_CARD_REGIONS.serialNumber.width * 100}%`,
+                  height: `${IDENTITY_CARD_REGIONS.serialNumber.height * 100}%`,
+                }}
+              >
+                <span>Seriya</span>
+              </div>
+              <div
+                className="scanner-field-hint"
+                style={{
+                  left: `${IDENTITY_CARD_REGIONS.fin.x * 100}%`,
+                  top: `${IDENTITY_CARD_REGIONS.fin.y * 100}%`,
+                  width: `${IDENTITY_CARD_REGIONS.fin.width * 100}%`,
+                  height: `${IDENTITY_CARD_REGIONS.fin.height * 100}%`,
+                }}
+              >
+                <span>FİN</span>
+              </div>
+            </div>
             <div className="scanner-guide-hints">
               <p>Şəxsiyyət vəsiqəsini çərçivəyə yerləşdirin</p>
-              <p>İşığın kifayət qədər olduğuna əmin olun</p>
+              <p>FİN və seriya nömrəsini işarələnmiş sahələrə uyğunlaşdırın</p>
               <p>Vəsiqəni sabit saxlayın</p>
             </div>
           </div>

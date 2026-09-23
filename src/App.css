@@ -172,6 +172,26 @@ body {
   border-bottom-right-radius: 1rem;
 }
 
+.scanner-field-hint {
+  position: absolute;
+  border: 2px dashed #fbbf24;
+  border-radius: 0.35rem;
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.scanner-field-hint span {
+  position: absolute;
+  top: -1.2rem;
+  left: 0;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #0f172a;
+  background: #fbbf24;
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+}
+
 .scanner-guide-hints {
   display: flex;
   flex-direction: column;
