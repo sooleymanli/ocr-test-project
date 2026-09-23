@@ -222,8 +222,8 @@ body {
 }
 
 .scanner-controls .btn {
-  padding: 0.55rem 1rem;
-  font-size: 0.9rem;
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 .modal-backdrop {
