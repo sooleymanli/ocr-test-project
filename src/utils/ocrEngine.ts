@@ -1,21 +1,20 @@
-import { PaddleOCR } from '@paddleocr/paddleocr-js'
+import { createWorker, type Worker } from 'tesseract.js'
 
-let enginePromise: ReturnType<typeof PaddleOCR.create> | null = null
+let workerPromise: Promise<Worker> | null = null
 
-/** Lazily creates a single reused PaddleOCR instance (WASM backend, Web Worker) for the whole app. */
-export function getOcrEngine() {
-  if (!enginePromise) {
-    enginePromise = PaddleOCR.create({
-      textDetectionModelName: 'PP-OCRv5_mobile_det',
-      textRecognitionModelName: 'PP-OCRv5_mobile_rec',
-      worker: true,
-      ortOptions: {
-        backend: 'wasm',
-      },
-    }).catch((err) => {
-      enginePromise = null
-      throw err
-    })
+/** Lazily creates a single reused tesseract.js worker for the whole app. */
+export function getOcrEngine(): Promise<Worker> {
+  if (!workerPromise) {
+    workerPromise = createWorker('eng')
+      .then(async (worker) => {
+        await worker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' })
+        return worker
+      })
+      .catch((err) => {
+        workerPromise = null
+        throw err
+      })
   }
-  return enginePromise
+  return workerPromise
 }
+

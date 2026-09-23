@@ -1,4 +1,4 @@
-import type { OcrResult } from '@paddleocr/paddleocr-js'
+import type { RecognizeResult } from 'tesseract.js'
 import {
   BURST_FRAME_COUNT,
   BURST_FRAME_INTERVAL_MS,
@@ -26,10 +26,10 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function bestReading(result: OcrResult | undefined): { text: string; score: number } | null {
-  if (!result || result.items.length === 0) return null
-  const best = result.items.reduce((a, b) => (b.score > a.score ? b : a))
-  return { text: best.text, score: best.score }
+function bestReading(result: RecognizeResult): { text: string; score: number } | null {
+  const text = result.data.text.trim()
+  if (!text) return null
+  return { text, score: result.data.confidence / 100 }
 }
 
 /**
@@ -52,8 +52,8 @@ export async function scanIdCard(video: HTMLVideoElement, guideRect: FractionalR
     const finCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.fin))
     const serialCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.serial))
 
-    const [finResult] = await ocr.predict(finCanvas)
-    const [serialResult] = await ocr.predict(serialCanvas)
+    const finResult = await ocr.recognize(finCanvas)
+    const serialResult = await ocr.recognize(serialCanvas)
 
     const finReading = bestReading(finResult)
     const serialReading = bestReading(serialResult)
@@ -95,8 +95,8 @@ export async function scanIdCardImage(imageBitmap: ImageBitmap, guideRect: Fract
   const finCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.fin))
   const serialCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.serial))
 
-  const [finResult] = await ocr.predict(finCanvas)
-  const [serialResult] = await ocr.predict(serialCanvas)
+  const finResult = await ocr.recognize(finCanvas)
+  const serialResult = await ocr.recognize(serialCanvas)
 
   const finReading = bestReading(finResult)
   const serialReading = bestReading(serialResult)

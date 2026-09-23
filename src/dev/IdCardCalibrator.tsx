@@ -106,12 +106,12 @@ function IdCardCalibrator() {
 
       const processed = preprocessForOcr(cropCanvas)
       const ocr = await getOcrEngine()
-      const [result] = await ocr.predict(processed)
-      const best = result?.items.reduce((a, b) => (b.score > a.score ? b : a), result.items[0])
+      const result = await ocr.recognize(processed)
+      const text = result.data.text.trim()
 
       setReadings((prev) => ({
         ...prev,
-        [key]: best ? { text: best.text, score: best.score } : 'error',
+        [key]: text ? { text, score: result.data.confidence / 100 } : 'error',
       }))
     } catch {
       setReadings((prev) => ({ ...prev, [key]: 'error' }))
