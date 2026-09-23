@@ -64,7 +64,7 @@ function CameraScanner({ onCapture, onClose }: CameraScannerProps) {
 
       <div className="scanner-guide">
         <div className="scanner-guide-frame" />
-        <p className="scanner-guide-text">Telefonu üfüqi tutub vəsiqəni çərçivə içinə yerləşdirin</p>
+        <p className="scanner-guide-text">Şəxsiyyət vəsiqəsini çərçivə içinə yerləşdirin</p>
       </div>
 
       <div className="scanner-controls">

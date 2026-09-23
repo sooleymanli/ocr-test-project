@@ -10,6 +10,8 @@ export interface ParsedIdCard {
 const FIN_RE = /\b[A-Z0-9]{7}\b/
 const SERIYA_NOMRE_RE = /\b[A-Z]{2}\d{7}\b/
 const DATE_RE = /\b\d{2}[./]\d{2}[./]\d{4}\b/
+const NAME_LINE_RE = /^[A-ZƏĞÇŞİÖÜ][A-ZƏĞÇŞİÖÜ'-]*$/
+const LABEL_WORDS = ['ADI', 'SOYADI', 'FIN', 'SERİYA', 'SERIYA', 'DOĞUM', 'DOGUM', 'AZƏRBAYCAN', 'REPUBLIKASI']
 
 function findLabelValue(lines: string[], labels: string[]): string | null {
   for (let i = 0; i < lines.length; i++) {
@@ -27,6 +29,13 @@ function findLabelValue(lines: string[], labels: string[]): string | null {
   return null
 }
 
+// Fallback: pick standalone all-caps name lines (no labels) when label-based lookup finds nothing.
+function findNameLines(lines: string[]): string[] {
+  return lines
+    .map((line) => line.toUpperCase())
+    .filter((line) => NAME_LINE_RE.test(line) && !LABEL_WORDS.some((word) => line.includes(word)))
+}
+
 export function parseIdCard(text: string): ParsedIdCard {
   const lines = text
     .split('\n')
@@ -37,11 +46,15 @@ export function parseIdCard(text: string): ParsedIdCard {
   const seriyaMatch = text.match(SERIYA_NOMRE_RE)
   const dateMatches = [...text.matchAll(new RegExp(DATE_RE.source, 'g'))]
 
+  const labelSoyadi = findLabelValue(lines, ['SOYADI', 'SURNAME', 'LAST NAME'])
+  const labelAdi = findLabelValue(lines, ['ADI', 'GIVEN NAME', 'FIRST NAME'])
+  const nameLines = labelSoyadi && labelAdi ? [] : findNameLines(lines)
+
   return {
     fin: finMatch ? finMatch[1] ?? finMatch[0] : null,
     seriyaNomre: seriyaMatch ? seriyaMatch[0] : null,
-    adi: findLabelValue(lines, ['ADI', 'GIVEN NAME', 'FIRST NAME']),
-    soyadi: findLabelValue(lines, ['SOYADI', 'SURNAME', 'LAST NAME']),
+    adi: labelAdi ?? nameLines[1] ?? null,
+    soyadi: labelSoyadi ?? nameLines[0] ?? null,
     dogumTarixi: dateMatches.length > 0 ? dateMatches[0][0] : null,
     raw: text,
   }
