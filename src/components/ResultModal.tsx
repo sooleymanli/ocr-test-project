@@ -1,23 +1,22 @@
-import type { ParsedIdCard } from '../utils/parseIdCard'
+import { useState } from 'react'
+import { FIN_REGEX, SERIAL_NUMBER_REGEX } from '../utils/validators'
+import type { ScanIdCardResult } from '../utils/scanIdCard'
 
 interface ResultModalProps {
-  imageDataUrl: string
-  parsed: ParsedIdCard | null
-  isProcessing: boolean
-  ocrError: string | null
-  onClose: () => void
+  result: ScanIdCardResult
   onRetry: () => void
+  onConfirm: (values: { fin: string; serial: string }) => void
+  onClose: () => void
 }
 
-const FIELDS: Array<{ key: keyof Omit<ParsedIdCard, 'raw'>; label: string }> = [
-  { key: 'adi', label: 'Adı' },
-  { key: 'soyadi', label: 'Soyadı' },
-  { key: 'fin', label: 'FİN' },
-  { key: 'seriyaNomre', label: 'Seriya nömrə' },
-  { key: 'dogumTarixi', label: 'Doğum tarixi' },
-]
+function ResultModal({ result, onRetry, onConfirm, onClose }: ResultModalProps) {
+  const [fin, setFin] = useState(result.fin.value ?? '')
+  const [serial, setSerial] = useState(result.serial.value ?? '')
 
-function ResultModal({ imageDataUrl, parsed, isProcessing, ocrError, onClose, onRetry }: ResultModalProps) {
+  const finValid = FIN_REGEX.test(fin)
+  const serialValid = SERIAL_NUMBER_REGEX.test(serial)
+  const anyUncertain = !result.fin.confident || !result.serial.confident
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal">
@@ -27,38 +26,49 @@ function ResultModal({ imageDataUrl, parsed, isProcessing, ocrError, onClose, on
 
         <h2>Skan nəticəsi</h2>
 
-        <img src={imageDataUrl} alt="Çəkilmiş şəxsiyyət vəsiqəsi" className="modal-preview" />
+        <img src={result.previewImage} alt="Çəkilmiş şəxsiyyət vəsiqəsi" className="modal-preview" />
 
-        {isProcessing ? (
-          <p className="modal-status">Mətn tanınır, gözləyin...</p>
-        ) : ocrError ? (
-          <p className="modal-status modal-status-error">{ocrError}</p>
-        ) : (
-          <>
-            <dl className="modal-fields">
-              {FIELDS.map(({ key, label }) => (
-                <div key={key} className="modal-field">
-                  <dt>{label}</dt>
-                  <dd>{parsed?.[key] ?? '—'}</dd>
-                </div>
-              ))}
-            </dl>
-
-            {parsed?.raw && (
-              <details className="modal-raw">
-                <summary>Tanınan tam mətn</summary>
-                <pre>{parsed.raw}</pre>
-              </details>
-            )}
-          </>
+        {anyUncertain && (
+          <p className="modal-status modal-status-warning">
+            Bəzi məlumatlar dəqiq oxunmadı. Zəhmət olmasa yoxlayın və ya yenidən çəkin.
+          </p>
         )}
+
+        <div className="modal-fields modal-fields-editable">
+          <label className="modal-field-editable">
+            <span>FİN {!result.fin.confident && <em className="modal-uncertain-tag">qeyri-dəqiq</em>}</span>
+            <input
+              value={fin}
+              onChange={(e) => setFin(e.target.value.toUpperCase())}
+              maxLength={7}
+              className={finValid ? '' : 'input-invalid'}
+              placeholder="0000000"
+            />
+          </label>
+
+          <label className="modal-field-editable">
+            <span>Seriya nömrə {!result.serial.confident && <em className="modal-uncertain-tag">qeyri-dəqiq</em>}</span>
+            <input
+              value={serial}
+              onChange={(e) => setSerial(e.target.value.toUpperCase())}
+              maxLength={9}
+              className={serialValid ? '' : 'input-invalid'}
+              placeholder="AA0000000"
+            />
+          </label>
+        </div>
 
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onRetry}>
             Yenidən çək
           </button>
-          <button type="button" className="btn btn-primary" onClick={onClose}>
-            Bağla
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!finValid || !serialValid}
+            onClick={() => onConfirm({ fin, serial })}
+          >
+            Təsdiqlə
           </button>
         </div>
       </div>

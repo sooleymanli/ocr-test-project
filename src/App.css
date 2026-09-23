@@ -79,6 +79,11 @@ body {
   z-index: 50;
 }
 
+.scanner-viewport {
+  position: relative;
+  flex: 1;
+}
+
 .scanner-video {
   position: fixed;
   inset: 0;
@@ -87,19 +92,37 @@ body {
   object-fit: cover;
 }
 
-.scanner-error {
+.scanner-placeholder {
   position: fixed;
   inset: 0;
-  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  text-align: center;
 }
 
-.scanner-canvas-hidden {
+.scanner-error {
+  color: #fff;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+}
+
+.scanner-file-input {
   display: none;
+}
+
+.scanner-scanning-badge {
+  position: fixed;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
 }
 
 .scanner-guide {
@@ -148,13 +171,20 @@ body {
   border-bottom-right-radius: 1rem;
 }
 
-.scanner-guide-text {
+.scanner-guide-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   color: #fff;
   background: rgba(0, 0, 0, 0.55);
-  padding: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
   border-radius: 0.5rem;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   text-align: center;
+}
+
+.scanner-guide-hints p {
+  margin: 0;
 }
 
 .scanner-controls {
@@ -227,6 +257,14 @@ body {
   color: #dc2626;
 }
 
+.modal-status-warning {
+  color: #b45309;
+  background: #fffbeb;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
 .modal-fields {
   display: grid;
   gap: 0.75rem;
@@ -252,30 +290,56 @@ body {
   word-break: break-word;
 }
 
-.modal-raw {
-  margin: 0 0 1.25rem;
-  font-size: 0.85rem;
-  color: #475569;
+.modal-fields-editable {
+  display: grid;
+  gap: 1rem;
 }
 
-.modal-raw summary {
-  cursor: pointer;
+.modal-field-editable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: #334155;
   font-weight: 600;
 }
 
-.modal-raw pre {
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: #f1f5f9;
+.modal-field-editable input {
+  font: inherit;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #cbd5e1;
   border-radius: 0.5rem;
-  padding: 0.75rem;
-  margin-top: 0.5rem;
+}
+
+.modal-field-editable input.input-invalid {
+  border-color: #dc2626;
+}
+
+.modal-uncertain-tag {
+  color: #b45309;
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.35rem;
 }
 
 .modal-actions {
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
+.confirmed-summary {
+  width: min(92vw, 360px);
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  text-align: left;
+  display: grid;
+  gap: 0.75rem;
 }
 
 @media (max-width: 480px) {

@@ -1,90 +1,79 @@
-import { useCallback, useState } from 'react'
-import { createWorker } from 'tesseract.js'
+import { useState } from 'react'
 import CameraScanner from './components/CameraScanner'
 import ResultModal from './components/ResultModal'
-import { parseIdCard, type ParsedIdCard } from './utils/parseIdCard'
+import type { ScanIdCardResult } from './utils/scanIdCard'
 import './App.css'
 
 type Stage = 'idle' | 'scanning' | 'result'
 
+interface ConfirmedValues {
+  fin: string
+  serial: string
+}
+
 function App() {
   const [stage, setStage] = useState<Stage>('idle')
-  const [capturedImage, setCapturedImage] = useState<string | null>(null)
-  const [parsed, setParsed] = useState<ParsedIdCard | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [ocrError, setOcrError] = useState<string | null>(null)
+  const [scanResult, setScanResult] = useState<ScanIdCardResult | null>(null)
+  const [confirmed, setConfirmed] = useState<ConfirmedValues | null>(null)
 
-  const runOcr = useCallback(async (imageDataUrl: string) => {
-    setIsProcessing(true)
-    setParsed(null)
-    setOcrError(null)
-    try {
-      const worker = await createWorker('aze+eng')
-      const { data } = await worker.recognize(imageDataUrl, {}, { blocks: true })
-      await worker.terminate()
-
-      // Drop low-confidence words (watermark/glare noise) before scanning for name fields.
-      const words = (data.blocks ?? []).flatMap((block) =>
-        block.paragraphs.flatMap((paragraph) => paragraph.lines.flatMap((line) => line.words)),
-      )
-      const cleanNameText = words
-        .filter((word) => word.confidence >= 55)
-        .map((word) => word.text)
-        .join('\n')
-
-      setParsed(parseIdCard(data.text, cleanNameText))
-    } catch (err) {
-      console.error('OCR failed', err)
-      setOcrError(err instanceof Error ? err.message : 'Mətn tanınarkən xəta baş verdi')
-    } finally {
-      setIsProcessing(false)
-    }
-  }, [])
-
-  function handleCapture(imageDataUrl: string) {
-    setCapturedImage(imageDataUrl)
+  function handleScanned(result: ScanIdCardResult) {
+    setScanResult(result)
     setStage('result')
-    void runOcr(imageDataUrl)
   }
 
   function handleClose() {
     setStage('idle')
-    setCapturedImage(null)
-    setParsed(null)
-    setOcrError(null)
+    setScanResult(null)
   }
 
   function handleRetry() {
-    setCapturedImage(null)
-    setParsed(null)
-    setOcrError(null)
+    setScanResult(null)
     setStage('scanning')
+  }
+
+  function handleConfirm(values: ConfirmedValues) {
+    setConfirmed(values)
+    setScanResult(null)
+    setStage('idle')
   }
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <h1>Şəxsiyyət Vəsiqəsi Skaneri</h1>
-        <p>Vəsiqəni kamera ilə çəkin, məlumatlar avtomatik oxunsun</p>
+        <p>Vəsiqəni kamera ilə çəkin, FİN və seriya nömrəsi avtomatik oxunsun</p>
       </header>
 
       <main className="app-main">
-        <button type="button" className="btn btn-primary btn-lg" onClick={() => setStage('scanning')}>
+        <button
+          type="button"
+          className="btn btn-primary btn-lg"
+          onClick={() => {
+            setConfirmed(null)
+            setStage('scanning')
+          }}
+        >
           Şəxsiyyət vəsiqəsini skan et
         </button>
+
+        {confirmed && (
+          <dl className="confirmed-summary">
+            <div className="modal-field">
+              <dt>FİN</dt>
+              <dd>{confirmed.fin}</dd>
+            </div>
+            <div className="modal-field">
+              <dt>Seriya nömrə</dt>
+              <dd>{confirmed.serial}</dd>
+            </div>
+          </dl>
+        )}
       </main>
 
-      {stage === 'scanning' && <CameraScanner onCapture={handleCapture} onClose={() => setStage('idle')} />}
+      {stage === 'scanning' && <CameraScanner onScanned={handleScanned} onClose={() => setStage('idle')} />}
 
-      {stage === 'result' && capturedImage && (
-        <ResultModal
-          imageDataUrl={capturedImage}
-          parsed={parsed}
-          isProcessing={isProcessing}
-          ocrError={ocrError}
-          onClose={handleClose}
-          onRetry={handleRetry}
-        />
+      {stage === 'result' && scanResult && (
+        <ResultModal result={scanResult} onRetry={handleRetry} onConfirm={handleConfirm} onClose={handleClose} />
       )}
     </div>
   )
