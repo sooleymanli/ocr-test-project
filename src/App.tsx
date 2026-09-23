@@ -72,6 +72,7 @@ function App() {
           </dl>
         )}
 
+
           <button type="button" className="btn btn-secondary" onClick={() => setShowCalibrator(true)}>
             Kalibrasiya aləti (dev)
           </button>
