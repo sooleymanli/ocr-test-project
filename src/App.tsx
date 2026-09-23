@@ -18,6 +18,7 @@ function App() {
   const [scanResult, setScanResult] = useState<ScanIdCardResult | null>(null)
   const [confirmed, setConfirmed] = useState<ConfirmedValues | null>(null)
   const [showCalibrator, setShowCalibrator] = useState(false)
+  const [calibrationImage, setCalibrationImage] = useState<string | undefined>(undefined)
 
   function handleScanned(result: ScanIdCardResult) {
     setScanResult(result)
@@ -38,6 +39,11 @@ function App() {
     setConfirmed(values)
     setScanResult(null)
     setStage('idle')
+  }
+
+  function handleCalibrate(imageUrl: string) {
+    setCalibrationImage(imageUrl)
+    setShowCalibrator(true)
   }
 
   return (
@@ -81,7 +87,13 @@ function App() {
       {stage === 'scanning' && <CameraScanner onScanned={handleScanned} onClose={() => setStage('idle')} />}
 
       {stage === 'result' && scanResult && (
-        <ResultModal result={scanResult} onRetry={handleRetry} onConfirm={handleConfirm} onClose={handleClose} />
+        <ResultModal
+          result={scanResult}
+          onRetry={handleRetry}
+          onConfirm={handleConfirm}
+          onClose={handleClose}
+          onCalibrate={handleCalibrate}
+        />
       )}
 
       {IdCardCalibrator && showCalibrator && (
@@ -90,7 +102,7 @@ function App() {
             Bağla
           </button>
           <Suspense fallback={<p>Yüklənir...</p>}>
-            <IdCardCalibrator />
+            <IdCardCalibrator initialImageUrl={calibrationImage} />
           </Suspense>
         </div>
       )}

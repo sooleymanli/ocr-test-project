@@ -7,9 +7,10 @@ interface ResultModalProps {
   onRetry: () => void
   onConfirm: (values: { fin: string; serial: string }) => void
   onClose: () => void
+  onCalibrate?: (imageUrl: string) => void
 }
 
-function ResultModal({ result, onRetry, onConfirm, onClose }: ResultModalProps) {
+function ResultModal({ result, onRetry, onConfirm, onClose, onCalibrate }: ResultModalProps) {
   const [fin, setFin] = useState(result.fin.value ?? '')
   const [serial, setSerial] = useState(result.serial.value ?? '')
 
@@ -62,6 +63,11 @@ function ResultModal({ result, onRetry, onConfirm, onClose }: ResultModalProps) 
           <button type="button" className="btn btn-secondary" onClick={onRetry}>
             Yenidən çək
           </button>
+          {onCalibrate && (
+            <button type="button" className="btn btn-secondary" onClick={() => onCalibrate(result.previewImage)}>
+              Bu şəkillə kalibrasiya et
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-primary"

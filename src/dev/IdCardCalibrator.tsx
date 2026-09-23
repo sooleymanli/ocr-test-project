@@ -33,8 +33,8 @@ function clampRegion(region: CropRegion): CropRegion {
 }
 
 /** Dev-only tool for visually calibrating the FIN/serial crop rectangles against a sample card photo. */
-function IdCardCalibrator() {
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl ?? null)
   const [regions, setRegions] = useState<Record<RegionKey, CropRegion>>(IDENTITY_CARD_REGIONS)
   const [readings, setReadings] = useState<Record<RegionKey, OcrReading | 'pending' | 'error' | null>>({
     serialNumber: null,
