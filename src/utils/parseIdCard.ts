@@ -7,11 +7,16 @@ export interface ParsedIdCard {
   raw: string
 }
 
-const FIN_RE = /\b[A-Z0-9]{7}\b/
+const FIN_RE = /\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{7}\b/
 const SERIYA_NOMRE_RE = /\b[A-Z]{2}\d{7}\b/
 const DATE_RE = /\b\d{2}[./]\d{2}[./]\d{4}\b/
-const NAME_LINE_RE = /^[A-ZƏĞÇŞİÖÜ][A-ZƏĞÇŞİÖÜ'-]*$/
-const LABEL_WORDS = ['ADI', 'SOYADI', 'FIN', 'SERİYA', 'SERIYA', 'DOĞUM', 'DOGUM', 'AZƏRBAYCAN', 'REPUBLIKASI']
+const NAME_WORD_RE = /[A-ZƏĞÇŞİÖÜ]{3,}/g
+const EXCLUDE_WORDS = new Set([
+  'ADI', 'SOYADI', 'FIN', 'SERİYA', 'SERIYA', 'DOĞUM', 'DOGUM',
+  'AZƏRBAYCAN', 'AZERBAIJAN', 'RESPUBLİKASI', 'REPUBLIC', 'REPUBLİKASI',
+  'ŞƏXSİYYƏT', 'VƏSİQƏSİ', 'IDENTITY', 'CARD', 'SURNAME', 'GIVEN', 'NAME',
+  'NATIONALITY', 'PERSONAL', 'HOLDERS', 'SIGNATURE', 'EXPIRY', 'BIRTH', 'DATE',
+])
 
 function findLabelValue(lines: string[], labels: string[]): string | null {
   for (let i = 0; i < lines.length; i++) {
@@ -29,11 +34,10 @@ function findLabelValue(lines: string[], labels: string[]): string | null {
   return null
 }
 
-// Fallback: pick standalone all-caps name lines (no labels) when label-based lookup finds nothing.
-function findNameLines(lines: string[]): string[] {
-  return lines
-    .map((line) => line.toUpperCase())
-    .filter((line) => NAME_LINE_RE.test(line) && !LABEL_WORDS.some((word) => line.includes(word)))
+// Fallback: pull uppercase name-like words out of noisy OCR lines, skipping document boilerplate.
+function findNameWords(text: string): string[] {
+  const matches = text.toUpperCase().match(NAME_WORD_RE) ?? []
+  return matches.filter((word) => !EXCLUDE_WORDS.has(word))
 }
 
 export function parseIdCard(text: string): ParsedIdCard {
@@ -48,13 +52,13 @@ export function parseIdCard(text: string): ParsedIdCard {
 
   const labelSoyadi = findLabelValue(lines, ['SOYADI', 'SURNAME', 'LAST NAME'])
   const labelAdi = findLabelValue(lines, ['ADI', 'GIVEN NAME', 'FIRST NAME'])
-  const nameLines = labelSoyadi && labelAdi ? [] : findNameLines(lines)
+  const nameWords = labelSoyadi && labelAdi ? [] : findNameWords(text)
 
   return {
     fin: finMatch ? finMatch[1] ?? finMatch[0] : null,
     seriyaNomre: seriyaMatch ? seriyaMatch[0] : null,
-    adi: labelAdi ?? nameLines[1] ?? null,
-    soyadi: labelSoyadi ?? nameLines[0] ?? null,
+    adi: labelAdi ?? nameWords[1] ?? null,
+    soyadi: labelSoyadi ?? nameWords[0] ?? null,
     dogumTarixi: dateMatches.length > 0 ? dateMatches[0][0] : null,
     raw: text,
   }
