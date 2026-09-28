@@ -5,18 +5,19 @@ import type { ScanIdCardResult } from '../utils/scanIdCard'
 interface ResultModalProps {
   result: ScanIdCardResult
   onRetry: () => void
-  onConfirm: (values: { fin: string; serial: string }) => void
+  onConfirm: (values: { fin: string; serial: string; fullName: string }) => void
   onClose: () => void
   onCalibrate?: (imageUrl: string) => void
 }
 
 function ResultModal({ result, onRetry, onConfirm, onClose, onCalibrate }: ResultModalProps) {
+  const [fullName, setFullName] = useState(result.fullName.value ?? '')
   const [fin, setFin] = useState(result.fin.value ?? '')
   const [serial, setSerial] = useState(result.serial.value ?? '')
 
   const finValid = FIN_REGEX.test(fin)
   const serialValid = SERIAL_NUMBER_REGEX.test(serial)
-  const anyUncertain = !result.fin.confident || !result.serial.confident
+  const anyUncertain = !result.fin.confident || !result.serial.confident || !result.fullName.confident
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -36,6 +37,16 @@ function ResultModal({ result, onRetry, onConfirm, onClose, onCalibrate }: Resul
         )}
 
         <div className="modal-fields modal-fields-editable">
+          <label className="modal-field-editable">
+            <span>A.S.A {!result.fullName.confident && <em className="modal-uncertain-tag">qeyri-dəqiq</em>}</span>
+            <input
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              placeholder="Ad Soyad Ata adı"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
           <label className="modal-field-editable">
             <span>FİN {!result.fin.confident && <em className="modal-uncertain-tag">qeyri-dəqiq</em>}</span>
             <input
@@ -60,7 +71,7 @@ function ResultModal({ result, onRetry, onConfirm, onClose, onCalibrate }: Resul
         </div>
 
         <section className="modal-all-text" aria-live="polite">
-          <h3>Oxunan bütün mətn</h3>
+          <h3>Seçilmiş bölgələrdən oxunan mətn</h3>
           <pre>{result.allText || 'Mətn oxunmadı'}</pre>
         </section>
 
@@ -77,7 +88,7 @@ function ResultModal({ result, onRetry, onConfirm, onClose, onCalibrate }: Resul
             type="button"
             className="btn btn-primary"
             disabled={!finValid || !serialValid}
-            onClick={() => onConfirm({ fin, serial })}
+            onClick={() => onConfirm({ fin, serial, fullName: fullName.trim() })}
           >
             Təsdiqlə
           </button>

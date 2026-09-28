@@ -42,16 +42,3 @@ export function normalizeSerial(raw: string): string | null {
   const fixed = letters + digits
   return SERIAL_NUMBER_REGEX.test(fixed) ? fixed : null
 }
-
-/** Accepts a value only if it appears identically in at least `minCount` of the readings. */
-export function pickConsensusValue(values: Array<string | null>, minCount: number): string | null {
-  const counts = new Map<string, number>()
-  for (const value of values) {
-    if (!value) continue
-    counts.set(value, (counts.get(value) ?? 0) + 1)
-  }
-  for (const [value, count] of counts) {
-    if (count >= minCount) return value
-  }
-  return null
-}

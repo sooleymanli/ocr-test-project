@@ -1,29 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { IDENTITY_CARD_REGIONS, type CropRegion } from '../config/identityCardRegions'
-import { getOcrEngine } from '../utils/ocrEngine'
-import { preprocessForOcr } from '../utils/imagePipeline'
-
-type RegionKey = keyof typeof IDENTITY_CARD_REGIONS
+import { OCR_UPSCALE } from '../config/idCardScan'
+import { IDENTITY_CARD_REGIONS, REGION_LABELS, type CropRegion, type RegionKey } from '../config/identityCardRegions'
+import { recognizeRegion } from '../utils/ocrEngine'
+import { cropFractionalRegion, preprocessForOcr } from '../utils/imagePipeline'
 
 interface OcrReading {
   text: string
   score: number
 }
 
-const REGION_LABELS: Record<RegionKey, string> = {
-  serialNumber: 'Seriya nömrə',
-  fin: 'FİN',
-}
+const REGION_KEYS = Object.keys(IDENTITY_CARD_REGIONS) as RegionKey[]
 
-const HANDLE_SIZE = 14
+const HANDLE_SIZE = 28
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value))
 }
 
 function clampRegion(region: CropRegion): CropRegion {
-  const width = clamp01(region.width)
-  const height = clamp01(region.height)
+  const width = Math.max(0.02, clamp01(region.width))
+  const height = Math.max(0.02, clamp01(region.height))
   return {
     x: clamp01(Math.min(region.x, 1 - width)),
     y: clamp01(Math.min(region.y, 1 - height)),
@@ -36,15 +32,14 @@ function clampRegion(region: CropRegion): CropRegion {
 function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
   const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl ?? null)
   const [regions, setRegions] = useState<Record<RegionKey, CropRegion>>(IDENTITY_CARD_REGIONS)
-  const [readings, setReadings] = useState<Record<RegionKey, OcrReading | 'pending' | 'error' | null>>({
-    serialNumber: null,
-    fin: null,
-  })
+  const [readings, setReadings] = useState(
+    () => Object.fromEntries(REGION_KEYS.map((key) => [key, null])) as Record<RegionKey, OcrReading | 'pending' | 'error' | null>,
+  )
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle')
 
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
-  const previewCanvasRefs = useRef<Record<RegionKey, HTMLCanvasElement | null>>({ serialNumber: null, fin: null })
+  const previewCanvasRefs = useRef<Partial<Record<RegionKey, HTMLCanvasElement | null>>>({})
   const dragState = useRef<{
     key: RegionKey
     mode: 'move' | 'resize'
@@ -80,22 +75,9 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
       if (!sourceCtx) throw new Error('no-context')
       sourceCtx.drawImage(image, 0, 0)
 
-      const cropCanvas = document.createElement('canvas')
-      cropCanvas.width = Math.max(1, Math.round(region.width * source.width))
-      cropCanvas.height = Math.max(1, Math.round(region.height * source.height))
-      const cropCtx = cropCanvas.getContext('2d')
-      if (!cropCtx) throw new Error('no-context')
-      cropCtx.drawImage(
-        source,
-        region.x * source.width,
-        region.y * source.height,
-        region.width * source.width,
-        region.height * source.height,
-        0,
-        0,
-        cropCanvas.width,
-        cropCanvas.height,
-      )
+      const cropCanvas = cropFractionalRegion(source, region, OCR_UPSCALE)
+      source.width = 0
+      source.height = 0
 
       const previewCanvas = previewCanvasRefs.current[key]
       if (previewCanvas) {
@@ -104,14 +86,13 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
         previewCanvas.getContext('2d')?.drawImage(cropCanvas, 0, 0)
       }
 
-      const processed = preprocessForOcr(cropCanvas)
-      const ocr = await getOcrEngine()
-      const result = await ocr.recognize(processed)
-      const text = result.data.text.trim()
+      const { text, score } = await recognizeRegion(preprocessForOcr(cropCanvas), key)
+      cropCanvas.width = 0
+      cropCanvas.height = 0
 
       setReadings((prev) => ({
         ...prev,
-        [key]: text ? { text, score: result.data.confidence / 100 } : 'error',
+        [key]: text ? { text, score } : 'error',
       }))
     } catch {
       setReadings((prev) => ({ ...prev, [key]: 'error' }))
@@ -181,7 +162,13 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
             onPointerUp={handlePointerUp}
           >
             {/* Reference image only used for calibration, not user-facing */}
-            <img ref={imageRef} src={imageUrl} className="calibrator-image" alt="Kalibrasiya üçün nümunə kart" />
+            <img
+              ref={imageRef}
+              src={imageUrl}
+              className="calibrator-image"
+              alt="Kalibrasiya üçün nümunə kart"
+              onLoad={() => REGION_KEYS.forEach((key) => void runOcrForRegion(key, regions[key]))}
+            />
 
             {(Object.keys(regions) as RegionKey[]).map((key) => {
               const r = regions[key]

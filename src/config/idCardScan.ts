@@ -10,19 +10,10 @@ export const NORMALIZED_CARD_HEIGHT = 638
 export type FractionalRect = CropRegion
 
 /** Crop regions for each field, as fractions of the normalized card canvas. Tune via IdCardCalibrator. */
-export const FIELD_CROP_REGIONS: Record<'fin' | 'serial', FractionalRect> = {
-  serial: IDENTITY_CARD_REGIONS.serialNumber,
-  fin: IDENTITY_CARD_REGIONS.fin,
-}
+export const FIELD_CROP_REGIONS = IDENTITY_CARD_REGIONS
 
 /** Minimum OCR confidence (0-1) to trust a single reading. */
 export const CONFIDENCE_THRESHOLD = 0.6
 
-/** How many burst frames are captured and analyzed per scan attempt. */
-export const BURST_FRAME_COUNT = 3
-
-/** Delay between burst frames in milliseconds. */
-export const BURST_FRAME_INTERVAL_MS = 180
-
-/** A value is accepted only if the same normalized value appears in at least this many frames. */
-export const REQUIRED_CONSENSUS_COUNT = 2
+/** Field crops are enlarged before OCR; Tesseract is more accurate on taller glyphs. */
+export const OCR_UPSCALE = 2

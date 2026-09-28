@@ -31,12 +31,13 @@ export function normalizeCardFrame(source: HTMLCanvasElement, guideRect: Fractio
 }
 
 /** Crops a fractional sub-region (e.g. the FIN or serial field) out of the normalized card canvas. */
-export function cropFractionalRegion(card: HTMLCanvasElement, rect: FractionalRect): HTMLCanvasElement {
+export function cropFractionalRegion(card: HTMLCanvasElement, rect: FractionalRect, scale = 1): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
-  canvas.width = Math.round(rect.width * card.width)
-  canvas.height = Math.round(rect.height * card.height)
+  canvas.width = Math.max(1, Math.round(rect.width * card.width * scale))
+  canvas.height = Math.max(1, Math.round(rect.height * card.height * scale))
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D konteksti alınmadı')
+  ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(
     card,
     rect.x * card.width,

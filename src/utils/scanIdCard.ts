@@ -1,15 +1,9 @@
-import type { RecognizeResult } from 'tesseract.js'
-import {
-  BURST_FRAME_COUNT,
-  BURST_FRAME_INTERVAL_MS,
-  CONFIDENCE_THRESHOLD,
-  FIELD_CROP_REGIONS,
-  REQUIRED_CONSENSUS_COUNT,
-  type FractionalRect,
-} from '../config/idCardScan'
-import { captureVideoFrame, cropFractionalRegion, normalizeCardFrame, preprocessForOcr } from './imagePipeline'
-import { getOcrEngine } from './ocrEngine'
-import { normalizeFin, normalizeSerial, pickConsensusValue } from './validators'
+import { CONFIDENCE_THRESHOLD, FIELD_CROP_REGIONS, OCR_UPSCALE, type FractionalRect } from '../config/idCardScan'
+import { REGION_LABELS, type RegionKey } from '../config/identityCardRegions'
+import { cropFractionalRegion, normalizeCardFrame, preprocessForOcr } from './imagePipeline'
+import { recognizeRegion } from './ocrEngine'
+import { cleanNameField } from './parseFullName'
+import { normalizeFin, normalizeSerial } from './validators'
 
 export interface FieldScanResult {
   value: string | null
@@ -19,105 +13,64 @@ export interface FieldScanResult {
 export interface ScanIdCardResult {
   fin: FieldScanResult
   serial: FieldScanResult
+  fullName: FieldScanResult
   previewImage: string
   allText: string
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
+const NAME_KEYS = ['givenName', 'surname', 'patronymic'] as const
 
-function bestReading(result: RecognizeResult): { text: string; score: number } | null {
-  const text = result.data.text.trim()
-  if (!text) return null
-  return { text, score: result.data.confidence / 100 }
-}
-
-/**
- * Captures a short burst of frames from the live video, crops the FIN and serial
- * regions from each, runs OCR independently per field, and only accepts a value
- * once it is read consistently (see REQUIRED_CONSENSUS_COUNT) across the burst.
- */
-export async function scanIdCard(video: HTMLVideoElement, guideRect: FractionalRect): Promise<ScanIdCardResult> {
-  const ocr = await getOcrEngine()
-
-  const finReadings: Array<string | null> = []
-  const serialReadings: Array<string | null> = []
-  let previewImage = ''
-  let allText = ''
-
-  for (let attempt = 0; attempt < BURST_FRAME_COUNT; attempt++) {
-    const frame = captureVideoFrame(video)
-    const card = normalizeCardFrame(frame, guideRect)
-    if (!previewImage) {
-      previewImage = card.toDataURL('image/jpeg', 0.92)
-      const fullCardResult = await ocr.recognize(card)
-      allText = fullCardResult.data.text.trim()
-    }
-
-    const finCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.fin))
-    const serialCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.serial))
-
-    const finResult = await ocr.recognize(finCanvas)
-    const serialResult = await ocr.recognize(serialCanvas)
-
-    const finReading = bestReading(finResult)
-    const serialReading = bestReading(serialResult)
-
-    finReadings.push(
-      finReading && finReading.score >= CONFIDENCE_THRESHOLD ? normalizeFin(finReading.text) : null,
-    )
-    serialReadings.push(
-      serialReading && serialReading.score >= CONFIDENCE_THRESHOLD ? normalizeSerial(serialReading.text) : null,
-    )
-
-    if (attempt < BURST_FRAME_COUNT - 1) await delay(BURST_FRAME_INTERVAL_MS)
-  }
-
-  const finValue = pickConsensusValue(finReadings, REQUIRED_CONSENSUS_COUNT)
-  const serialValue = pickConsensusValue(serialReadings, REQUIRED_CONSENSUS_COUNT)
-
-  return {
-    fin: { value: finValue, confident: finValue !== null },
-    serial: { value: serialValue, confident: serialValue !== null },
-    previewImage,
-    allText,
+async function readRegion(card: HTMLCanvasElement, key: RegionKey) {
+  const crop = cropFractionalRegion(card, FIELD_CROP_REGIONS[key], OCR_UPSCALE)
+  try {
+    return await recognizeRegion(preprocessForOcr(crop), key)
+  } finally {
+    crop.width = 0
+    crop.height = 0
   }
 }
 
-/** Runs the same field OCR + normalization pipeline against a single still image (gallery upload fallback). */
-export async function scanIdCardImage(imageBitmap: ImageBitmap, guideRect: FractionalRect): Promise<ScanIdCardResult> {
-  const ocr = await getOcrEngine()
+function firstValid(text: string, normalize: (raw: string) => string | null): string | null {
+  for (const candidate of [text, ...text.split(/\s+/)]) {
+    const value = normalize(candidate)
+    if (value) return value
+  }
+  return null
+}
 
+/** OCRs only the five calibrated field regions of a captured card image. */
+export async function scanIdCardImage(image: ImageBitmap | HTMLCanvasElement, guideRect: FractionalRect): Promise<ScanIdCardResult> {
   const source = document.createElement('canvas')
-  source.width = imageBitmap.width
-  source.height = imageBitmap.height
+  source.width = image.width
+  source.height = image.height
   const ctx = source.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D konteksti alınmadı')
-  ctx.drawImage(imageBitmap, 0, 0)
+  ctx.drawImage(image, 0, 0)
 
   const card = normalizeCardFrame(source, guideRect)
+  source.width = 0
+  source.height = 0
   const previewImage = card.toDataURL('image/jpeg', 0.92)
-  const fullCardResult = await ocr.recognize(card)
-  const allText = fullCardResult.data.text.trim()
+  try {
+    const keys = Object.keys(FIELD_CROP_REGIONS) as RegionKey[]
+    const readings = {} as Record<RegionKey, { text: string; score: number }>
+    for (const key of keys) readings[key] = await readRegion(card, key)
 
-  const finCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.fin))
-  const serialCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.serial))
+    const trusted = (key: RegionKey) => readings[key].score >= CONFIDENCE_THRESHOLD
+    const fin = trusted('fin') ? firstValid(readings.fin.text, normalizeFin) : null
+    const serial = trusted('serial') ? firstValid(readings.serial.text, normalizeSerial) : null
+    const names = NAME_KEYS.map((key) => cleanNameField(readings[key].text))
+    const fullName = names.filter(Boolean).join(' ')
 
-  const finResult = await ocr.recognize(finCanvas)
-  const serialResult = await ocr.recognize(serialCanvas)
-
-  const finReading = bestReading(finResult)
-  const serialReading = bestReading(serialResult)
-
-  const finValue = finReading && finReading.score >= CONFIDENCE_THRESHOLD ? normalizeFin(finReading.text) : null
-  const serialValue =
-    serialReading && serialReading.score >= CONFIDENCE_THRESHOLD ? normalizeSerial(serialReading.text) : null
-
-  return {
-    fin: { value: finValue, confident: finValue !== null },
-    serial: { value: serialValue, confident: serialValue !== null },
-    previewImage,
-    allText,
+    return {
+      fin: { value: fin, confident: fin !== null },
+      serial: { value: serial, confident: serial !== null },
+      fullName: { value: fullName || null, confident: names.every(Boolean) && NAME_KEYS.every(trusted) },
+      previewImage,
+      allText: keys.map((key) => `${REGION_LABELS[key]}: ${readings[key].text}`).join('\n'),
+    }
+  } finally {
+    card.width = 0
+    card.height = 0
   }
 }

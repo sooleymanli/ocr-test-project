@@ -11,6 +11,7 @@ type Stage = 'idle' | 'scanning' | 'result'
 interface ConfirmedValues {
   fin: string
   serial: string
+  fullName: string
 }
 
 function App() {
@@ -67,6 +68,10 @@ function App() {
 
         {confirmed && (
           <dl className="confirmed-summary">
+            <div className="modal-field">
+              <dt>A.S.A</dt>
+              <dd>{confirmed.fullName || 'Oxunmadı'}</dd>
+            </div>
             <div className="modal-field">
               <dt>FİN</dt>
               <dd>{confirmed.fin}</dd>
