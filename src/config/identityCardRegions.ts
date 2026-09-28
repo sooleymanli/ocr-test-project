@@ -30,8 +30,8 @@ export const IDENTITY_CARD_REGIONS = {
     height: 0.075,
   },
   serial: {
-    x: 0.348,
-    y: 0.699,
+    x: 0.351,
+    y: 0.702,
     width: 0.248,
     height: 0.064,
   },
@@ -42,7 +42,6 @@ export const IDENTITY_CARD_REGIONS = {
     height: 0.067,
   },
 } satisfies Record<string, CropRegion>
-
 
 export type RegionKey = keyof typeof IDENTITY_CARD_REGIONS
 
