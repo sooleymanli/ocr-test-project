@@ -1,5 +1,5 @@
 import { CONFIDENCE_THRESHOLD, FIELD_CROP_REGIONS, OCR_UPSCALE, type FractionalRect } from '../config/idCardScan'
-import { REGION_LABELS, type RegionKey } from '../config/identityCardRegions'
+import { INK_THRESHOLD, REGION_LABELS, type RegionKey } from '../config/identityCardRegions'
 import { cropFractionalRegion, normalizeCardFrame, preprocessForOcr } from './imagePipeline'
 import { recognizeRegion } from './ocrEngine'
 import { cleanNameField } from './parseFullName'
@@ -23,7 +23,7 @@ const NAME_KEYS = ['givenName', 'surname', 'patronymic'] as const
 async function readRegion(card: HTMLCanvasElement, key: RegionKey) {
   const crop = cropFractionalRegion(card, FIELD_CROP_REGIONS[key], OCR_UPSCALE)
   try {
-    return await recognizeRegion(preprocessForOcr(crop), key)
+    return await recognizeRegion(preprocessForOcr(crop, INK_THRESHOLD), key)
   } finally {
     crop.width = 0
     crop.height = 0

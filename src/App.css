@@ -313,6 +313,49 @@ body {
   cursor: nwse-resize;
 }
 
+.cropper-handle-n,
+.cropper-handle-s,
+.cropper-handle-e,
+.cropper-handle-w {
+  border: none;
+  background: #22d3ee;
+  border-radius: 4px;
+}
+
+.cropper-handle-n,
+.cropper-handle-s {
+  left: 50%;
+  width: 36px;
+  height: 8px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.cropper-handle-n {
+  top: -5px;
+}
+
+.cropper-handle-s {
+  bottom: -5px;
+}
+
+.cropper-handle-e,
+.cropper-handle-w {
+  top: 50%;
+  width: 8px;
+  height: 36px;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.cropper-handle-e {
+  right: -5px;
+}
+
+.cropper-handle-w {
+  left: -5px;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -542,6 +585,14 @@ body {
   border: 2px solid #0f172a;
   border-radius: 50%;
   cursor: nwse-resize;
+}
+
+.calibrator-threshold {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 1rem 0;
+  max-width: 420px;
 }
 
 .calibrator-panels {

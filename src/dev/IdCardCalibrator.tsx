@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { OCR_UPSCALE } from '../config/idCardScan'
-import { IDENTITY_CARD_REGIONS, REGION_LABELS, type CropRegion, type RegionKey } from '../config/identityCardRegions'
+import { IDENTITY_CARD_REGIONS, INK_THRESHOLD, REGION_LABELS, type CropRegion, type RegionKey } from '../config/identityCardRegions'
 import { recognizeRegion } from '../utils/ocrEngine'
 import { cropFractionalRegion, preprocessForOcr } from '../utils/imagePipeline'
 
@@ -36,6 +36,7 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
     () => Object.fromEntries(REGION_KEYS.map((key) => [key, null])) as Record<RegionKey, OcrReading | 'pending' | 'error' | null>,
   )
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle')
+  const [inkThreshold, setInkThreshold] = useState(INK_THRESHOLD)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -62,7 +63,7 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
     setImageUrl(URL.createObjectURL(file))
   }
 
-  const runOcrForRegion = useCallback(async (key: RegionKey, region: CropRegion) => {
+  const runOcrForRegion = useCallback(async (key: RegionKey, region: CropRegion, threshold: number) => {
     const image = imageRef.current
     if (!image || !image.naturalWidth) return
 
@@ -79,6 +80,7 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
       source.width = 0
       source.height = 0
 
+      preprocessForOcr(cropCanvas, threshold)
       const previewCanvas = previewCanvasRefs.current[key]
       if (previewCanvas) {
         previewCanvas.width = cropCanvas.width
@@ -86,7 +88,7 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
         previewCanvas.getContext('2d')?.drawImage(cropCanvas, 0, 0)
       }
 
-      const { text, score } = await recognizeRegion(preprocessForOcr(cropCanvas), key)
+      const { text, score } = await recognizeRegion(cropCanvas, key)
       cropCanvas.width = 0
       cropCanvas.height = 0
 
@@ -131,7 +133,7 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
   function handlePointerUp() {
     const drag = dragState.current
     dragState.current = null
-    if (drag) void runOcrForRegion(drag.key, regions[drag.key])
+    if (drag) void runOcrForRegion(drag.key, regions[drag.key], inkThreshold)
   }
 
   async function handleCopyConfig() {
@@ -141,7 +143,7 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
         return `  ${key}: {\n    x: ${r.x.toFixed(3)},\n    y: ${r.y.toFixed(3)},\n    width: ${r.width.toFixed(3)},\n    height: ${r.height.toFixed(3)},\n  },`
       })
       .join('\n')
-    const text = `export const IDENTITY_CARD_REGIONS = {\n${body}\n} satisfies Record<string, CropRegion>`
+    const text = `export const IDENTITY_CARD_REGIONS = {\n${body}\n} satisfies Record<string, CropRegion>\n\nexport const INK_THRESHOLD = ${inkThreshold.toFixed(2)}`
     await navigator.clipboard.writeText(text)
     setCopyStatus('copied')
     setTimeout(() => setCopyStatus('idle'), 1500)
@@ -167,7 +169,7 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
               src={imageUrl}
               className="calibrator-image"
               alt="Kalibrasiya üçün nümunə kart"
-              onLoad={() => REGION_KEYS.forEach((key) => void runOcrForRegion(key, regions[key]))}
+              onLoad={() => REGION_KEYS.forEach((key) => void runOcrForRegion(key, regions[key], inkThreshold))}
             />
 
             {(Object.keys(regions) as RegionKey[]).map((key) => {
@@ -189,6 +191,27 @@ function IdCardCalibrator({ initialImageUrl }: { initialImageUrl?: string }) {
               )
             })}
           </div>
+
+          <label className="calibrator-threshold">
+            Qara rəng həddi: {inkThreshold.toFixed(2)}
+            <input
+              type="range"
+              min={0.1}
+              max={0.9}
+              step={0.01}
+              value={inkThreshold}
+              onChange={(event) => setInkThreshold(Number(event.target.value))}
+              onPointerUp={(event) => {
+                const value = Number(event.currentTarget.value)
+                REGION_KEYS.forEach((key) => void runOcrForRegion(key, regions[key], value))
+              }}
+              onKeyUp={(event) => {
+                const value = Number(event.currentTarget.value)
+                REGION_KEYS.forEach((key) => void runOcrForRegion(key, regions[key], value))
+              }}
+            />
+            <small>Kiçik dəyər: yalnız ən qara yazı. Böyük dəyər: daha açıq ton da oxunur.</small>
+          </label>
 
           <div className="calibrator-panels">
             {(Object.keys(regions) as RegionKey[]).map((key) => {

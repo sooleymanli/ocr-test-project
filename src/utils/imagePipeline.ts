@@ -52,59 +52,55 @@ export function cropFractionalRegion(card: HTMLCanvasElement, rect: FractionalRe
   return canvas
 }
 
-/** Grayscale + contrast stretch + light sharpen, to improve OCR legibility on small text crops. */
-export function preprocessForOcr(canvas: HTMLCanvasElement): HTMLCanvasElement {
+// Channel spread above this is treated as colored (pink background, red/blue print), never as black ink.
+const MAX_INK_CHROMA = 70
+
+function percentile(histogram: Uint32Array, total: number, fraction: number): number {
+  const target = total * fraction
+  let count = 0
+  for (let value = 0; value < histogram.length; value++) {
+    count += histogram[value]
+    if (count >= target) return value
+  }
+  return histogram.length - 1
+}
+
+/**
+ * Keeps only dark, uncolored pixels (the black data print) and whitens everything else,
+ * so lighter gray field titles and the colored background are not read.
+ * `inkThreshold` (0-1) is where the cut sits between the darkest ink and the paper tone.
+ */
+export function preprocessForOcr(canvas: HTMLCanvasElement, inkThreshold: number): HTMLCanvasElement {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D konteksti alınmadı')
 
   const { width, height } = canvas
   const imageData = ctx.getImageData(0, 0, width, height)
   const { data } = imageData
+  const total = width * height
 
-  // Grayscale
-  const gray = new Uint8ClampedArray(width * height)
-  for (let i = 0; i < gray.length; i++) {
+  const luminance = new Uint8ClampedArray(total)
+  const histogram = new Uint32Array(256)
+  for (let i = 0; i < total; i++) {
+    const value = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2]
+    luminance[i] = value
+    histogram[luminance[i]]++
+  }
+
+  const ink = percentile(histogram, total, 0.01)
+  const paper = percentile(histogram, total, 0.5)
+  const cutoff = ink + (paper - ink) * inkThreshold
+
+  for (let i = 0; i < total; i++) {
     const r = data[i * 4]
     const g = data[i * 4 + 1]
     const b = data[i * 4 + 2]
-    gray[i] = 0.299 * r + 0.587 * g + 0.114 * b
-  }
-
-  // Contrast stretch based on observed min/max
-  let min = 255
-  let max = 0
-  for (const value of gray) {
-    if (value < min) min = value
-    if (value > max) max = value
-  }
-  const range = Math.max(max - min, 1)
-
-  // Simple 3x3 sharpen kernel applied after contrast-stretching
-  const stretched = new Uint8ClampedArray(gray.length)
-  for (let i = 0; i < gray.length; i++) {
-    stretched[i] = ((gray[i] - min) / range) * 255
-  }
-
-  const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0]
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      let sum = 0
-      let k = 0
-      for (let ky = -1; ky <= 1; ky++) {
-        for (let kx = -1; kx <= 1; kx++) {
-          const sx = Math.min(width - 1, Math.max(0, x + kx))
-          const sy = Math.min(height - 1, Math.max(0, y + ky))
-          sum += stretched[sy * width + sx] * kernel[k]
-          k++
-        }
-      }
-      const idx = (y * width + x) * 4
-      const value = Math.min(255, Math.max(0, sum))
-      data[idx] = value
-      data[idx + 1] = value
-      data[idx + 2] = value
-      data[idx + 3] = 255
-    }
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b)
+    const value = luminance[i] <= cutoff && chroma <= MAX_INK_CHROMA ? 0 : 255
+    data[i * 4] = value
+    data[i * 4 + 1] = value
+    data[i * 4 + 2] = value
+    data[i * 4 + 3] = 255
   }
 
   ctx.putImageData(imageData, 0, 0)
