@@ -31,15 +31,15 @@ export const IDENTITY_CARD_REGIONS = {
   },
   serial: {
     x: 0.351,
-    y: 0.702,
+    y: 0.697,
     width: 0.248,
-    height: 0.064,
+    height: 0.077,
   },
   fin: {
-    x: 0.626,
+    x: 0.629,
     y: 0.701,
     width: 0.260,
-    height: 0.067,
+    height: 0.077,
   },
 } satisfies Record<string, CropRegion>
 
