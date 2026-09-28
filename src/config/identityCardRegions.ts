@@ -12,36 +12,38 @@ export interface CropRegion {
  */
 export const IDENTITY_CARD_REGIONS = {
   surname: {
-    x: 0.337,
+    x: 0.349,
     y: 0.202,
     width: 0.357,
     height: 0.080,
   },
   givenName: {
-    x: 0.335,
-    y: 0.326,
+    x: 0.348,
+    y: 0.333,
     width: 0.360,
     height: 0.079,
   },
   patronymic: {
-    x: 0.334,
-    y: 0.453,
+    x: 0.348,
+    y: 0.450,
     width: 0.361,
     height: 0.075,
   },
   serial: {
-    x: 0.337,
+    x: 0.348,
     y: 0.699,
-    width: 0.284,
-    height: 0.071,
+    width: 0.248,
+    height: 0.064,
   },
   fin: {
-    x: 0.630,
-    y: 0.696,
-    width: 0.313,
-    height: 0.078,
+    x: 0.626,
+    y: 0.701,
+    width: 0.260,
+    height: 0.067,
   },
 } satisfies Record<string, CropRegion>
+
+
 export type RegionKey = keyof typeof IDENTITY_CARD_REGIONS
 
 export const REGION_LABELS: Record<RegionKey, string> = {

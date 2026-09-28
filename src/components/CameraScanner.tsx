@@ -1,25 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CropRegion } from '../config/identityCardRegions'
 import { captureVideoFrame, computeGuideFractionInVideo } from '../utils/imagePipeline'
 import { scanIdCardImage, type ScanIdCardResult } from '../utils/scanIdCard'
+import CardCropper from './CardCropper'
 
 interface CameraScannerProps {
   onScanned: (result: ScanIdCardResult) => void
   onClose: () => void
 }
 
-type CameraState = 'idle' | 'starting' | 'live' | 'scanning' | 'unsupported' | 'denied' | 'error'
+type CameraState = 'idle' | 'starting' | 'live' | 'cropping' | 'scanning' | 'unsupported' | 'denied' | 'error'
+type CapturedSource = HTMLCanvasElement | ImageBitmap
+
+const DEFAULT_CROP: CropRegion = { x: 0.05, y: 0.05, width: 0.9, height: 0.9 }
+
+function releaseSource(source: CapturedSource | null) {
+  if (source instanceof HTMLCanvasElement) {
+    source.width = 0
+    source.height = 0
+  } else {
+    source?.close()
+  }
+}
 
 function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const sourceRef = useRef<CapturedSource | null>(null)
   const operationRef = useRef(0)
   const busyRef = useRef(false)
 
   const [cameraState, setCameraState] = useState<CameraState>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
+  const [cropRect, setCropRect] = useState<CropRegion>(DEFAULT_CROP)
   const [videoReady, setVideoReady] = useState(false)
 
   const stopStream = useCallback(() => {
@@ -27,10 +43,22 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
     streamRef.current = null
   }, [])
 
+  const clearCapture = useCallback(() => {
+    releaseSource(sourceRef.current)
+    sourceRef.current = null
+    setCapturedImage(null)
+  }, [])
+
   useEffect(() => () => {
     operationRef.current++
     stopStream()
+    releaseSource(sourceRef.current)
+    sourceRef.current = null
   }, [stopStream])
+
+  useEffect(() => () => {
+    if (capturedImage?.startsWith('blob:')) URL.revokeObjectURL(capturedImage)
+  }, [capturedImage])
 
   // The <video> element only mounts once cameraState is 'live', so attach the
   // stream here (after it exists in the DOM) instead of right after getUserMedia resolves.
@@ -45,35 +73,46 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
     }
   }, [cameraState, stopStream])
 
-  async function handleCapture() {
+  function handleCapture() {
     const video = videoRef.current
     const frame = frameRef.current
     if (busyRef.current || cameraState !== 'live' || !video || !frame || !videoReady) return
 
-    busyRef.current = true
-    const operation = ++operationRef.current
-    let snapshot: HTMLCanvasElement | null = null
     try {
       const guideRect = computeGuideFractionInVideo(video, frame.getBoundingClientRect(), video.getBoundingClientRect())
-      snapshot = captureVideoFrame(video)
+      const snapshot = captureVideoFrame(video)
+      clearCapture()
+      sourceRef.current = snapshot
+      setCropRect(guideRect)
       setCapturedImage(snapshot.toDataURL('image/jpeg', 0.92))
-      setCameraState('scanning')
       setErrorMessage(null)
+      setCameraState('cropping')
       stopStream()
+    } catch {
+      setErrorMessage('Şəkil çəkilə bilmədi. Yenidən cəhd edin.')
+    }
+  }
+
+  async function handleRead() {
+    const source = sourceRef.current
+    if (busyRef.current || cameraState !== 'cropping' || !source) return
+
+    busyRef.current = true
+    const operation = ++operationRef.current
+    setCameraState('scanning')
+    try {
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
       if (operation !== operationRef.current) return
-      const result = await scanIdCardImage(snapshot, guideRect)
-      if (operation === operationRef.current) onScanned(result)
+      const result = await scanIdCardImage(source, cropRect)
+      if (operation !== operationRef.current) return
+      clearCapture()
+      onScanned(result)
     } catch {
       if (operation === operationRef.current) {
         setErrorMessage('Şəkil oxunarkən xəta baş verdi. Yenidən cəhd edin.')
-        setCameraState('error')
+        setCameraState('cropping')
       }
     } finally {
-      if (snapshot) {
-        snapshot.width = 0
-        snapshot.height = 0
-      }
       if (operation === operationRef.current) busyRef.current = false
     }
   }
@@ -89,7 +128,7 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
 
     setCameraState('starting')
     setVideoReady(false)
-    setCapturedImage(null)
+    clearCapture()
     setErrorMessage(null)
     stopStream()
     try {
@@ -114,7 +153,7 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
         setErrorMessage('Kameraya giriş mümkün olmadı. Qalereyadan şəkil yükləyə bilərsiniz.')
       }
     }
-  }, [stopStream])
+  }, [clearCapture, stopStream])
 
   // Open the camera as soon as the scanner is shown, matching the "tap scan → camera opens" expectation.
   useEffect(() => {
@@ -130,23 +169,25 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
 
     busyRef.current = true
     const operation = ++operationRef.current
-    setCameraState('scanning')
-    setCapturedImage(null)
     setErrorMessage(null)
     stopStream()
-    let bitmap: ImageBitmap | null = null
     try {
-      bitmap = await createImageBitmap(file)
-      if (operation !== operationRef.current) return
-      const result = await scanIdCardImage(bitmap, { x: 0, y: 0, width: 1, height: 1 })
-      if (operation === operationRef.current) onScanned(result)
+      const bitmap = await createImageBitmap(file)
+      if (operation !== operationRef.current) {
+        bitmap.close()
+        return
+      }
+      clearCapture()
+      sourceRef.current = bitmap
+      setCropRect(DEFAULT_CROP)
+      setCapturedImage(URL.createObjectURL(file))
+      setCameraState('cropping')
     } catch {
       if (operation === operationRef.current) {
         setCameraState('error')
-        setErrorMessage('Şəkil oxunarkən xəta baş verdi. Yenidən cəhd edin.')
+        setErrorMessage('Şəkil açılmadı. Başqa şəkil seçin.')
       }
     } finally {
-      bitmap?.close()
       if (operation === operationRef.current) busyRef.current = false
     }
   }
@@ -162,8 +203,11 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
       <div className="scanner-viewport">
         {cameraState === 'live' ? (
           <video ref={videoRef} className="scanner-video" autoPlay playsInline muted onLoadedData={() => setVideoReady(true)} />
-        ) : cameraState === 'scanning' && capturedImage ? (
-          <img className="scanner-video" src={capturedImage} alt="Çəkilmiş şəkil" />
+        ) : (cameraState === 'cropping' || cameraState === 'scanning') && capturedImage ? (
+          <div className={cameraState === 'scanning' ? 'scanner-crop scanner-crop-busy' : 'scanner-crop'}>
+            <CardCropper imageUrl={capturedImage} rect={cropRect} onChange={setCropRect} />
+            {cameraState === 'cropping' && errorMessage && <p className="scanner-error">{errorMessage}</p>}
+          </div>
         ) : (
           <div className="scanner-placeholder">
             {errorMessage && <p className="scanner-error">{errorMessage}</p>}
@@ -206,6 +250,17 @@ function CameraScanner({ onScanned, onClose }: CameraScannerProps) {
           <button type="button" className="btn btn-primary" onClick={handleCapture} disabled={!videoReady}>
             Şəkil çək
           </button>
+        )}
+
+        {cameraState === 'cropping' && (
+          <>
+            <button type="button" className="btn btn-secondary" onClick={handleStartCamera}>
+              Yenidən çək
+            </button>
+            <button type="button" className="btn btn-primary" onClick={handleRead}>
+              Oxu
+            </button>
+          </>
         )}
 
         {cameraState === 'idle' || cameraState === 'unsupported' || cameraState === 'denied' || cameraState === 'error' ? (
