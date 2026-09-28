@@ -20,6 +20,7 @@ export interface ScanIdCardResult {
   fin: FieldScanResult
   serial: FieldScanResult
   previewImage: string
+  allText: string
 }
 
 function delay(ms: number): Promise<void> {
@@ -43,11 +44,16 @@ export async function scanIdCard(video: HTMLVideoElement, guideRect: FractionalR
   const finReadings: Array<string | null> = []
   const serialReadings: Array<string | null> = []
   let previewImage = ''
+  let allText = ''
 
   for (let attempt = 0; attempt < BURST_FRAME_COUNT; attempt++) {
     const frame = captureVideoFrame(video)
     const card = normalizeCardFrame(frame, guideRect)
-    if (!previewImage) previewImage = card.toDataURL('image/jpeg', 0.92)
+    if (!previewImage) {
+      previewImage = card.toDataURL('image/jpeg', 0.92)
+      const fullCardResult = await ocr.recognize(card)
+      allText = fullCardResult.data.text.trim()
+    }
 
     const finCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.fin))
     const serialCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.serial))
@@ -75,6 +81,7 @@ export async function scanIdCard(video: HTMLVideoElement, guideRect: FractionalR
     fin: { value: finValue, confident: finValue !== null },
     serial: { value: serialValue, confident: serialValue !== null },
     previewImage,
+    allText,
   }
 }
 
@@ -91,6 +98,8 @@ export async function scanIdCardImage(imageBitmap: ImageBitmap, guideRect: Fract
 
   const card = normalizeCardFrame(source, guideRect)
   const previewImage = card.toDataURL('image/jpeg', 0.92)
+  const fullCardResult = await ocr.recognize(card)
+  const allText = fullCardResult.data.text.trim()
 
   const finCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.fin))
   const serialCanvas = preprocessForOcr(cropFractionalRegion(card, FIELD_CROP_REGIONS.serial))
@@ -109,5 +118,6 @@ export async function scanIdCardImage(imageBitmap: ImageBitmap, guideRect: Fract
     fin: { value: finValue, confident: finValue !== null },
     serial: { value: serialValue, confident: serialValue !== null },
     previewImage,
+    allText,
   }
 }

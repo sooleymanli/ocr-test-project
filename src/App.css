@@ -351,6 +351,31 @@ body {
   margin-left: 0.35rem;
 }
 
+.modal-all-text {
+  margin-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.85rem;
+}
+
+.modal-all-text h3 {
+  margin: 0 0 0.5rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.modal-all-text pre {
+  margin: 0;
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #334155;
+  background: #f1f5f9;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font: 0.85rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .modal-actions {
   display: flex;
   gap: 0.75rem;

@@ -59,6 +59,11 @@ function ResultModal({ result, onRetry, onConfirm, onClose, onCalibrate }: Resul
           </label>
         </div>
 
+        <section className="modal-all-text" aria-live="polite">
+          <h3>Oxunan bütün mətn</h3>
+          <pre>{result.allText || 'Mətn oxunmadı'}</pre>
+        </section>
+
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onRetry}>
             Yenidən çək
